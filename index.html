@@ -9,6 +9,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
+
+/* ===== BASE ===== */
+
 body{
 margin:0;
 font-family:Inter,system-ui;
@@ -22,8 +25,20 @@ margin:auto;
 padding:20px;
 }
 
-.title{font-size:20px;font-weight:600;}
-.subtitle{font-size:12px;color:#7f96b2;margin-top:3px;}
+/* ===== HEADER ===== */
+
+.title{
+font-size:20px;
+font-weight:600;
+}
+
+.subtitle{
+font-size:12px;
+color:#7f96b2;
+margin-top:3px;
+}
+
+/* ===== METRICS (FIXED SMALL) ===== */
 
 .metrics{
 display:flex;
@@ -33,12 +48,39 @@ font-size:13px;
 color:#9fb2c9;
 }
 
-.metrics b{color:#fff;font-weight:500;}
+.metrics b{
+color:#fff;
+font-weight:500;
+}
+
+/* ===== CONTROLS ===== */
+
+.controls{
+margin-top:12px;
+}
+
+.btn{
+background:none;
+border:none;
+color:#7f96b2;
+font-size:12px;
+margin-right:10px;
+cursor:pointer;
+}
+
+.btn.active{
+color:#fff;
+font-weight:500;
+}
+
+/* ===== CHART ===== */
 
 .chart-box{
 margin-top:10px;
 height:240px;
 }
+
+/* ===== SIGNAL ===== */
 
 .signal{
 margin-top:12px;
@@ -46,11 +88,14 @@ font-size:13px;
 color:#c6d4e5;
 }
 
+/* ===== FOOTER ===== */
+
 .footer{
 margin-top:10px;
 font-size:11px;
 color:#6f859f;
 }
+
 </style>
 </head>
 
@@ -59,9 +104,16 @@ color:#6f859f;
 <div class="wrap">
 
 <div class="title">US Yield</div>
-<div class="subtitle">US 10Y Treasury</div>
+<div class="subtitle">FRED 10Y Treasury yield (daily)</div>
 
 <div class="metrics" id="metrics"></div>
+
+<div class="controls">
+<button class="btn active" onclick="setRange(7, event)">1W</button>
+<button class="btn" onclick="setRange(30, event)">1M</button>
+<button class="btn" onclick="setRange(90, event)">3M</button>
+<button class="btn" onclick="setRange(365, event)">1Y</button>
+</div>
 
 <div class="chart-box">
 <canvas id="chart"></canvas>
@@ -70,7 +122,7 @@ color:#6f859f;
 <div class="signal" id="signal"></div>
 
 <div class="footer">
-BondStats Data · Daily
+FRED Data · Daily
 </div>
 
 </div>
@@ -78,7 +130,40 @@ BondStats Data · Daily
 <script>
 
 let chart;
-const URL = "https://botapi33.github.io/bondstats-global-yields/global_yields.json";
+let range = 30;
+
+/* ===== FRED CONFIG ===== */
+/* IMPORTANT:
+   GitHub Secrets are NOT available directly inside frontend HTML/JS.
+   If you want direct browser loading from FRED, you must place the key here.
+*/
+const FRED_API_KEY = "YOUR_FRED_API_KEY";
+
+/* ===== FETCH FRED ===== */
+
+async function fetchUS(){
+
+const url = `https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json`;
+
+const res = await fetch(url);
+const data = await res.json();
+
+if (!data.observations) {
+throw new Error("No FRED observations returned");
+}
+
+const obs = data.observations
+.filter(o => o.value !== "." && o.value !== "" && o.value !== null)
+.map(o => ({
+date: o.date,
+value: parseFloat(o.value)
+}));
+
+const sliced = obs.slice(-range);
+
+return sliced;
+
+}
 
 /* ===== CHART ===== */
 
@@ -94,34 +179,72 @@ datasets:[{
 data:data.map(d=>d.value),
 borderColor:"#6ee7b7",
 borderWidth:2,
-pointRadius:4,
-tension:0.25
+pointRadius:0,
+tension:0.15
 }]
 },
 options:{
 responsive:true,
 maintainAspectRatio:false,
-plugins:{legend:{display:false}},
+
+interaction:{
+mode:"nearest",
+intersect:false
+},
+
+plugins:{
+legend:{display:false},
+tooltip:{
+backgroundColor:"#0b1f33",
+titleColor:"#fff",
+bodyColor:"#cfe3f5",
+displayColors:false,
+callbacks:{
+label:ctx=> ctx.raw.toFixed(2)+"%"
+}
+}
+},
+
 scales:{
-x:{display:false},
+x:{
+ticks:{display:false},
+grid:{display:false}
+},
 y:{
 ticks:{
 color:"#7f96b2",
 callback:v=>v.toFixed(2)+"%"
 },
-grid:{color:"rgba(255,255,255,0.05)"}
+grid:{
+color:"rgba(255,255,255,0.05)"
+}
 }
 }
 }
 });
+
 }
 
 /* ===== SIGNAL ===== */
 
-function signal(change){
+function signal(change,trend){
 
-if(change > 0) return "Yields rising → tightening conditions";
-if(change < 0) return "Yields declining → easing conditions";
+if(change > 0 && trend > 0){
+return "Yields rising with momentum → tightening conditions";
+}
+
+if(change > 0){
+return "Short-term increase in yields";
+}
+
+if(change < 0 && trend < 0){
+return "Yields declining → easing conditions";
+}
+
+if(change < 0){
+return "Mild pullback in yields";
+}
+
 return "Stable yield environment";
 
 }
@@ -130,34 +253,54 @@ return "Stable yield environment";
 
 async function load(){
 
-const res = await fetch(URL);
-const json = await res.json();
+const data = await fetchUS();
 
-const us = json.countries["united_states"];
-
-if(!us){
-document.getElementById("metrics").innerText = "No US data";
-return;
+if (data.length < 2) {
+throw new Error("Not enough data points");
 }
 
-const data = [
-{date: us.previousDate, value: us.previousValue},
-{date: us.date, value: us.value}
-];
+const latest = data[data.length-1];
+const prev = data[data.length-2];
+
+const change = latest.value - prev.value;
+const trend = latest.value - data[0].value;
+
+/* METRICS (FIXED CLEAN) */
 
 document.getElementById("metrics").innerHTML = `
-Yield: <b>${us.value.toFixed(2)}%</b>
-Daily: <b style="color:${us.change>0?'#6ee7b7':'#ff6b6b'}">${us.change.toFixed(2)}</b>
-Updated: <b>${us.date}</b>
+Yield: <b>${latest.value.toFixed(2)}%</b>
+Daily: <b style="color:${change>0?'#6ee7b7':'#ff6b6b'}">${change.toFixed(2)}</b>
+Updated: <b>${latest.date}</b>
 `;
+
+/* CHART */
 
 drawChart(data);
 
-document.getElementById("signal").innerText = signal(us.change);
+/* SIGNAL */
+
+document.getElementById("signal").innerText = signal(change,trend);
 
 }
 
+/* ===== RANGE ===== */
+
+function setRange(r, ev){
+
+range = r;
+
+document.querySelectorAll(".btn").forEach(b=>b.classList.remove("active"));
+ev.target.classList.add("active");
+
 load();
+
+}
+
+load().catch(err => {
+document.getElementById("metrics").innerHTML = `<span style="color:#ff6b6b">Error loading US yield data</span>`;
+document.getElementById("signal").innerText = err.message;
+console.error(err);
+});
 
 </script>
 
