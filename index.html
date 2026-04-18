@@ -83,7 +83,7 @@ font-size:11px;
 color:#6f859f;
 }
 
-/* ===== SHARE / EMBED ===== */
+/* ACTIONS */
 
 .actions{
 margin-top:12px;
@@ -183,10 +183,10 @@ let range = 30;
 
 const HIST_URL = "https://raw.githubusercontent.com/Botapi33/us_yield_history.json/main/us_yield_history.json";
 
-/* 👉 WICHTIG: deine echte Seite */
-const PAGE_URL = "https://www.bondstats.org/markets/daily-us-bond-yield";
+/* 💥 AUTO SHARE FIX */
+const PAGE_URL = window.location.origin + window.location.pathname;
 
-/* 👉 GitHub Embed (bewusst getrennt) */
+/* EMBED bleibt aktuelle Seite */
 const EMBED_URL = window.location.href;
 
 /* ===== FETCH ===== */
@@ -276,7 +276,8 @@ Updated: <b>${latest.date}</b>
 drawChart(data);
 document.getElementById("signal").innerText = signal(change,trend);
 
-/* SET SHARE + EMBED */
+/* SHARE + EMBED */
+
 document.getElementById("shareLink").innerText = PAGE_URL;
 
 document.getElementById("embedCode").innerText =
@@ -293,7 +294,7 @@ e.target.classList.add("active");
 load();
 }
 
-/* ===== SHARE / EMBED ===== */
+/* ===== ACTIONS ===== */
 
 function toggleEmbed(){
 document.getElementById("embedBox").classList.toggle("active");
