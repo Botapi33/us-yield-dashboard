@@ -181,13 +181,14 @@ FRED Data (DGS10) · Daily
 let chart;
 let range = 30;
 
+/* ===== DATA ===== */
 const HIST_URL = "https://raw.githubusercontent.com/Botapi33/us_yield_history.json/main/us_yield_history.json";
 
-/* 💥 AUTO SHARE FIX */
-const PAGE_URL = window.location.origin + window.location.pathname;
+/* 💥 FIX: HARDCODE SHARE URL */
+const PAGE_URL = "https://www.bondstats.org/markets/daily-us-bond-yield";
 
-/* EMBED bleibt aktuelle Seite */
-const EMBED_URL = window.location.href;
+/* 💥 EMBED = IMMER GITHUB */
+const EMBED_URL = "https://botapi33.github.io/us-yield-dashboard/";
 
 /* ===== FETCH ===== */
 
