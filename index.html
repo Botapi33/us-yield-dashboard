@@ -10,7 +10,6 @@
 
 <style>
 
-/* ===== BASE ===== */
 body{
 margin:0;
 font-family:Inter,system-ui;
@@ -24,7 +23,6 @@ margin:auto;
 padding:20px;
 }
 
-/* ===== HEADER ===== */
 .title{
 font-size:20px;
 font-weight:600;
@@ -36,13 +34,13 @@ color:#7f96b2;
 margin-top:3px;
 }
 
-/* ===== METRICS ===== */
 .metrics{
 display:flex;
 gap:20px;
 margin-top:12px;
 font-size:13px;
 color:#9fb2c9;
+flex-wrap:wrap;
 }
 
 .metrics b{
@@ -50,7 +48,6 @@ color:#fff;
 font-weight:500;
 }
 
-/* ===== CONTROLS ===== */
 .controls{
 margin-top:12px;
 }
@@ -69,24 +66,61 @@ color:#fff;
 font-weight:500;
 }
 
-/* ===== CHART ===== */
 .chart-box{
 margin-top:10px;
 height:240px;
 }
 
-/* ===== SIGNAL ===== */
 .signal{
 margin-top:12px;
 font-size:13px;
 color:#c6d4e5;
 }
 
-/* ===== FOOTER ===== */
 .footer{
 margin-top:10px;
 font-size:11px;
 color:#6f859f;
+}
+
+/* ===== SHARE / EMBED ===== */
+
+.actions{
+margin-top:12px;
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+}
+
+.action-btn{
+background:rgba(255,255,255,0.08);
+border:1px solid rgba(255,255,255,0.15);
+color:#fff;
+padding:8px 12px;
+border-radius:8px;
+font-size:12px;
+cursor:pointer;
+}
+
+.share-box{
+margin-top:10px;
+background:rgba(255,255,255,0.05);
+padding:10px;
+border-radius:8px;
+font-size:11px;
+word-break:break-all;
+display:none;
+}
+
+.share-box.active{
+display:block;
+}
+
+.share-actions{
+margin-top:8px;
+display:flex;
+gap:8px;
+flex-wrap:wrap;
 }
 
 </style>
@@ -102,10 +136,10 @@ color:#6f859f;
 <div class="metrics" id="metrics"></div>
 
 <div class="controls">
-<button class="btn active" onclick="setRange(7, event)">1W</button>
-<button class="btn" onclick="setRange(30, event)">1M</button>
-<button class="btn" onclick="setRange(90, event)">3M</button>
-<button class="btn" onclick="setRange(365, event)">1Y</button>
+<button class="btn active" onclick="setRange(7,event)">1W</button>
+<button class="btn" onclick="setRange(30,event)">1M</button>
+<button class="btn" onclick="setRange(90,event)">3M</button>
+<button class="btn" onclick="setRange(365,event)">1Y</button>
 </div>
 
 <div class="chart-box">
@@ -118,6 +152,28 @@ color:#6f859f;
 FRED Data (DGS10) · Daily
 </div>
 
+<!-- ACTIONS -->
+<div class="actions">
+<button class="action-btn" onclick="toggleEmbed()">Embed US Yield Chart</button>
+<button class="action-btn" onclick="toggleShare()">Share this chart</button>
+</div>
+
+<!-- EMBED -->
+<div class="share-box" id="embedBox">
+<code id="embedCode"></code>
+</div>
+
+<!-- SHARE -->
+<div class="share-box" id="shareBox">
+<div id="shareLink"></div>
+
+<div class="share-actions">
+<button class="action-btn" onclick="copyLink()">Copy Link</button>
+<button class="action-btn" onclick="shareX()">X</button>
+<button class="action-btn" onclick="shareLinkedIn()">LinkedIn</button>
+</div>
+</div>
+
 </div>
 
 <script>
@@ -127,16 +183,18 @@ let range = 30;
 
 const HIST_URL = "https://raw.githubusercontent.com/Botapi33/us_yield_history.json/main/us_yield_history.json";
 
+/* 👉 WICHTIG: deine echte Seite */
+const PAGE_URL = "https://www.bondstats.org/markets/daily-us-bond-yield";
+
+/* 👉 GitHub Embed (bewusst getrennt) */
+const EMBED_URL = window.location.href;
+
 /* ===== FETCH ===== */
 
 async function fetchUS(){
-
 const res = await fetch(HIST_URL);
 const data = await res.json();
-
-/* nur letzte Range */
 return data.slice(-range);
-
 }
 
 /* ===== CHART ===== */
@@ -160,12 +218,7 @@ tension:0.15
 options:{
 responsive:true,
 maintainAspectRatio:false,
-
-interaction:{
-mode:"nearest",
-intersect:false
-},
-
+interaction:{mode:"nearest",intersect:false},
 plugins:{
 legend:{display:false},
 tooltip:{
@@ -174,51 +227,29 @@ titleColor:"#fff",
 bodyColor:"#cfe3f5",
 displayColors:false,
 callbacks:{
-label:ctx=> ctx.raw.toFixed(2)+"%"
+label:ctx=>ctx.raw.toFixed(2)+"%"
 }
 }
 },
-
 scales:{
-x:{
-ticks:{display:false},
-grid:{display:false}
-},
+x:{ticks:{display:false},grid:{display:false}},
 y:{
-ticks:{
-color:"#7f96b2",
-callback:v=>v.toFixed(2)+"%"
-},
-grid:{
-color:"rgba(255,255,255,0.05)"
-}
+ticks:{color:"#7f96b2",callback:v=>v.toFixed(2)+"%"},
+grid:{color:"rgba(255,255,255,0.05)"}
 }
 }
 }
 });
-
 }
 
 /* ===== SIGNAL ===== */
 
 function signal(change,trend){
 
-if(change > 0 && trend > 0){
-return "Yields rising with momentum → tightening conditions";
-}
-
-if(change > 0){
-return "Short-term increase in yields";
-}
-
-if(change < 0 && trend < 0){
-return "Yields declining → easing conditions";
-}
-
-if(change < 0){
-return "Mild pullback in yields";
-}
-
+if(change>0 && trend>0) return "Yields rising with momentum → tightening conditions";
+if(change>0) return "Short-term increase in yields";
+if(change<0 && trend<0) return "Yields declining → easing conditions";
+if(change<0) return "Mild pullback in yields";
 return "Stable yield environment";
 
 }
@@ -228,8 +259,7 @@ return "Stable yield environment";
 async function load(){
 
 const data = await fetchUS();
-
-if(data.length < 2) return;
+if(data.length<2) return;
 
 const latest = data[data.length-1];
 const prev = data[data.length-2];
@@ -237,35 +267,52 @@ const prev = data[data.length-2];
 const change = latest.value - prev.value;
 const trend = latest.value - data[0].value;
 
-/* METRICS */
-
 document.getElementById("metrics").innerHTML = `
 Yield: <b>${latest.value.toFixed(2)}%</b>
 Daily: <b style="color:${change>0?'#6ee7b7':'#ff6b6b'}">${change.toFixed(2)}</b>
 Updated: <b>${latest.date}</b>
 `;
 
-/* CHART */
-
 drawChart(data);
-
-/* SIGNAL */
-
 document.getElementById("signal").innerText = signal(change,trend);
+
+/* SET SHARE + EMBED */
+document.getElementById("shareLink").innerText = PAGE_URL;
+
+document.getElementById("embedCode").innerText =
+`<iframe src="${EMBED_URL}" width="100%" height="300" frameborder="0"></iframe>`;
 
 }
 
 /* ===== RANGE ===== */
 
-function setRange(r, ev){
-
-range = r;
-
+function setRange(r,e){
+range=r;
 document.querySelectorAll(".btn").forEach(b=>b.classList.remove("active"));
-ev.target.classList.add("active");
-
+e.target.classList.add("active");
 load();
+}
 
+/* ===== SHARE / EMBED ===== */
+
+function toggleEmbed(){
+document.getElementById("embedBox").classList.toggle("active");
+}
+
+function toggleShare(){
+document.getElementById("shareBox").classList.toggle("active");
+}
+
+function copyLink(){
+navigator.clipboard.writeText(PAGE_URL);
+}
+
+function shareX(){
+window.open(`https://twitter.com/intent/tweet?url=${PAGE_URL}`,"_blank");
+}
+
+function shareLinkedIn(){
+window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${PAGE_URL}`,"_blank");
 }
 
 load();
